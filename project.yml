@@ -1,0 +1,31 @@
+name: 3DStudio
+options:
+  bundleIdPrefix: com.studio3d
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  3DStudio:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: Web
+        type: folder
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: 3D Studio
+        UILaunchScreen: {}
+        UIRequiresFullScreen: true
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+    settings:
+      base:
+        PRODUCT_NAME: 3DStudio
+        PRODUCT_BUNDLE_IDENTIFIER: com.studio3d.app
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
