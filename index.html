@@ -1,0 +1,153 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<title>3D Studio</title>
+<style>
+:root{--bg:#202226;--pn:#2d3036;--ln:#41454d;--ac:#4da3ff;--tx:#d8dbe0}
+*{box-sizing:border-box;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:12px system-ui,sans-serif;overflow:hidden}
+#app{display:grid;height:100%;grid-template:"t t t" 38px "l v r" 1fr "b b b" 24px/52px 1fr 190px;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#app.hr{grid-template-columns:52px 1fr 0}#app.hr #r{display:none}
+#t{grid-area:t;display:flex;gap:4px;align-items:center;padding:3px 6px;background:var(--pn);border-bottom:1px solid var(--ln);overflow-x:auto}
+#l{grid-area:l;display:flex;flex-direction:column;gap:3px;padding:4px;background:var(--pn);border-right:1px solid var(--ln);overflow-y:auto}
+#r{grid-area:r;padding:6px;background:var(--pn);border-left:1px solid var(--ln);overflow-y:auto}
+#v{grid-area:v;position:relative;min-height:0}#c{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#b{grid-area:b;display:flex;gap:14px;align-items:center;padding:0 8px;background:var(--pn);border-top:1px solid var(--ln);white-space:nowrap;overflow:hidden}
+button,select,input{font:inherit;color:var(--tx)}
+.b{background:#383c44;border:1px solid var(--ln);border-radius:5px;padding:5px 6px;white-space:nowrap}
+.b.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+#pn{width:120px;background:#1a1c1f;border:1px solid var(--ln);border-radius:4px;padding:4px;-webkit-user-select:text;user-select:text}
+h4{margin:8px 0 4px;font-size:11px;color:#9aa0aa;text-transform:uppercase}
+.g{display:grid;grid-template-columns:1fr 1fr;gap:3px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+#r input,#r select{width:100%;background:#1a1c1f;border:1px solid var(--ln);border-radius:4px;padding:3px;-webkit-user-select:text;user-select:text}
+#r input[type=color]{padding:0;height:24px}
+#ol button{display:block;width:100%;text-align:left;margin-bottom:2px}
+#rot{display:none;position:fixed;inset:0;background:#000d;z-index:9;align-items:center;justify-content:center;font-size:18px}
+@media(orientation:portrait){#rot{display:flex}}
+</style></head><body>
+<div id="rot">Rotate your device to landscape</div>
+<div id="app">
+<div id="t"><b>3D Studio</b><input id="pn" value="Untitled">
+<button class="b" id="bn">New</button><button class="b" id="bu">Undo</button><button class="b" id="br">Redo</button>
+<button class="b" id="bs">Save</button><button class="b" id="bo">Open</button><button class="b" id="be">Export</button>
+<button class="b" id="bf">Full</button><button class="b" id="bp">Panel</button>
+<input type="file" id="fi" accept=".json" hidden></div>
+<div id="l"></div>
+<div id="v"><canvas id="c"></canvas></div>
+<div id="r">
+<h4>Add object</h4><div class="g" id="ad"></div>
+<h4>Properties</h4>
+<input id="n" placeholder="Name">
+<div class="g3"><input id="px" type="number" step=".5"><input id="py" type="number" step=".5"><input id="pz" type="number" step=".5"></div>
+<div class="g3"><input id="sx" type="number" step=".5" min=".01"><input id="sy" type="number" step=".5" min=".01"><input id="sz" type="number" step=".5" min=".01"></div>
+<div class="g"><input id="col" type="color"><select id="mt"></select></div>
+<div class="g" style="margin-top:4px"><button class="b" id="dp">Duplicate</button><button class="b" id="dl">Delete</button></div>
+<h4>View</h4><div class="g3"><button class="b" id="vt">Top</button><button class="b" id="vf">Front</button><button class="b" id="vi">Iso</button></div>
+<button class="b" id="ve" style="width:100%;margin-top:3px">Zoom extents</button>
+<label style="display:block;margin-top:5px"><input id="sn" type="checkbox" checked style="width:auto"> Snap 0.5</label>
+<h4>Objects</h4><div id="ol"></div></div>
+<div id="b"><span id="st"></span><span id="co"></span><span id="di"></span></div>
+</div>
+<script src="three.min.js"></script>
+<script>window.THREE||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>
+<script>
+const T=THREE,$=id=>document.getElementById(id),cl=(v,a,b)=>Math.min(b,Math.max(a,v));
+const cv=$('c'),R=new T.WebGLRenderer({canvas:cv,antialias:true});R.shadowMap.enabled=true;R.setPixelRatio(Math.min(devicePixelRatio,2));
+const S=new T.Scene();S.background=new T.Color(0x2b2e33);
+const cam=new T.PerspectiveCamera(50,1,.1,500);
+S.add(new T.HemisphereLight(0xffffff,0x555566,.7));
+const sun=new T.DirectionalLight(0xffffff,.9);sun.position.set(8,14,6);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20});S.add(sun);
+const gr=new T.Mesh(new T.PlaneGeometry(200,200).rotateX(-Math.PI/2),new T.ShadowMaterial({opacity:.25}));gr.receiveShadow=true;S.add(gr);
+S.add(new T.GridHelper(40,40,0x666b75,0x3a3e45),new T.AxesHelper(3));
+const W=new T.Group();S.add(W);
+const bx=new T.BoxHelper(W,0x4da3ff);bx.visible=false;S.add(bx);
+let tgt=new T.Vector3(),th=.8,ph=1,dist=14;
+function updCam(){cam.position.set(tgt.x+dist*Math.sin(ph)*Math.sin(th),tgt.y+dist*Math.cos(ph),tgt.z+dist*Math.sin(ph)*Math.cos(th));cam.lookAt(tgt)}
+function pan(dx,dy){cam.updateMatrixWorld();const s=dist*.0015;tgt.addScaledVector(new T.Vector3().setFromMatrixColumn(cam.matrixWorld,0),-dx*s).addScaledVector(new T.Vector3().setFromMatrixColumn(cam.matrixWorld,1),dy*s);updCam()}
+const G={cube:()=>new T.BoxGeometry(1,1,1),sphere:()=>new T.SphereGeometry(.5,32,20),cylinder:()=>new T.CylinderGeometry(.5,.5,1,32),cone:()=>new T.ConeGeometry(.5,1,32),pyramid:()=>new T.ConeGeometry(.7071,1,4).rotateY(Math.PI/4),torus:()=>new T.TorusGeometry(.35,.15,16,40).rotateX(Math.PI/2)};
+const P={Plastic:[.4,0,1,'#c8ccd2'],Wood:[.8,0,1,'#8b5a2b'],Concrete:[.95,0,1,'#9a9a9a'],Brick:[.9,0,1,'#a0452d'],Metal:[.25,1,1,'#b8bcc2'],Glass:[.05,.1,.35,'#9fd3e8'],Marble:[.2,0,1,'#eeeeee']};
+$('mt').innerHTML=Object.keys(P).map(k=>`<option>${k}</option>`).join('');
+function mat(m){const u=m.userData,p=P[u.m]||P.Plastic,x=m.material;x.color.set(u.c);x.roughness=p[0];x.metalness=p[1];x.opacity=p[2];x.transparent=p[2]<1}
+function mk(d){const m=new T.Mesh(G[d.t](),new T.MeshStandardMaterial());m.castShadow=m.receiveShadow=true;
+ m.userData={t:d.t,n:d.n||d.t,c:d.c||'#c8ccd2',m:d.m||'Plastic'};m.position.fromArray(d.p||[0,.5,0]);m.rotation.y=d.r||0;m.scale.fromArray(d.s||[1,1,1]);mat(m);W.add(m);return m}
+const ser=m=>({t:m.userData.t,n:m.userData.n,c:m.userData.c,m:m.userData.m,p:m.position.toArray().map(v=>+v.toFixed(4)),r:+m.rotation.y.toFixed(4),s:m.scale.toArray().map(v=>+v.toFixed(4))});
+const TOOLS=[['select','Select','Tap object to select. Drag empty space to orbit.'],['move','Move','Drag an object on the ground plane.'],['rotate','Rotate','Drag left/right to rotate selected object.'],['scale','Scale','Drag up/down to scale selected object.'],['pull','Push/Pull','Drag up/down to change object height.'],['rect','Rect','Tap two corners on the ground.'],['circ','Circle','Tap center, then a point for radius.'],['line','Line','Tap two points on the ground.'],['erase','Eraser','Tap an object to delete it.']];
+let tool='select',p0=null,sel=null;
+$('l').innerHTML=TOOLS.map(t=>`<button class="b" data-t="${t[0]}">${t[1]}</button>`).join('');
+document.querySelectorAll('#l .b').forEach(b=>b.onclick=()=>{tool=b.dataset.t;p0=null;document.querySelectorAll('#l .b').forEach(x=>x.classList.toggle('on',x==b));$('st').textContent=TOOLS.find(t=>t[0]==tool)[2]});
+document.querySelector('#l .b').click();
+$('ad').innerHTML=['cube','sphere','cylinder','cone','pyramid','torus','plane'].map(k=>`<button class="b" data-a="${k}">${k}</button>`).join('');
+document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const k=b.dataset.a;const o=k=='plane'?mk({t:'cube',n:'plane',s:[3,.02,3],p:[0,.01,0]}):mk({t:k,p:[0,k=='torus'?.15:.5,0]});select(o);commit()});
+const ray=new T.Raycaster(),mv=new T.Vector2(),pl=new T.Plane(new T.Vector3(0,1,0),0);
+function setRay(e){const r=cv.getBoundingClientRect();mv.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(mv,cam)}
+function pick(e){setRay(e);const h=ray.intersectObjects(W.children,false)[0];return h&&h.object}
+function gp(e){setRay(e);const v=new T.Vector3();return ray.ray.intersectPlane(pl,v)?v:null}
+const sn=v=>$('sn').checked?Math.round(v/.5)*.5:v;
+const F=['n','px','py','pz','sx','sy','sz','col','mt'];
+function select(m){sel=m;bx.visible=!!m;fill();list()}
+function upd(){if(sel)bx.setFromObject(sel);fill()}
+function fill(){F.forEach(i=>$(i).disabled=!sel);if(!sel){$('di').textContent='';return}
+ const u=sel.userData,p=sel.position,s=sel.scale;$('n').value=u.n;$('px').value=+p.x.toFixed(2);$('py').value=+p.y.toFixed(2);$('pz').value=+p.z.toFixed(2);
+ $('sx').value=+s.x.toFixed(2);$('sy').value=+s.y.toFixed(2);$('sz').value=+s.z.toFixed(2);$('col').value=u.c;$('mt').value=u.m;
+ $('di').textContent=`Size ${s.x.toFixed(2)} x ${s.y.toFixed(2)} x ${s.z.toFixed(2)}`;bx.setFromObject(sel)}
+F.forEach(i=>$(i).onchange=()=>{if(!sel)return;const u=sel.userData;u.n=$('n').value;sel.position.set(+$('px').value,+$('py').value,+$('pz').value);
+ sel.scale.set(...['sx','sy','sz'].map(k=>Math.max(.01,+$(k).value||1)));
+ if(i=='mt'){u.m=$('mt').value;u.c=P[u.m][3]}else u.c=$('col').value;mat(sel);upd();commit()});
+function list(){$('ol').innerHTML='';W.children.forEach(m=>{const b=document.createElement('button');b.className='b'+(m==sel?' on':'');b.textContent=m.userData.n;b.onclick=()=>select(m);$('ol').appendChild(b)})}
+$('dl').onclick=()=>{if(sel){W.remove(sel);select(null);commit()}};
+$('dp').onclick=()=>{if(sel){const d=ser(sel);d.p[0]+=1;d.n+=' copy';select(mk(d));commit()}};
+let H=[],hi=-1;const snap=()=>JSON.stringify(W.children.map(ser));
+function commit(){H=H.slice(0,hi+1);H.push(snap());hi++;if(H.length>80){H.shift();hi--}save();list();upd()}
+function load(js,keep){const i=keep&&sel?W.children.indexOf(sel):-1;while(W.children.length)W.remove(W.children[0]);JSON.parse(js).forEach(mk);select(i>=0?W.children[i]:null)}
+$('bu').onclick=()=>{if(hi>0){hi--;load(H[hi],1)}};$('br').onclick=()=>{if(hi<H.length-1){hi++;load(H[hi],1)}};
+const db=new Promise(r=>{try{const q=indexedDB.open('studio3d',1);q.onupgradeneeded=()=>q.result.createObjectStore('p');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)}catch(e){r(null)}});
+function save(){db.then(d=>d&&d.transaction('p','readwrite').objectStore('p').put({name:$('pn').value,data:snap()},'auto'))}
+function init(){H=[snap()];hi=0;list();fill()}
+db.then(d=>{if(!d)return init();const q=d.transaction('p').objectStore('p').get('auto');q.onsuccess=()=>{const v=q.result;if(v){$('pn').value=v.name;try{JSON.parse(v.data).forEach(mk)}catch(e){}}init()};q.onerror=init});
+$('pn').onchange=save;
+$('bs').onclick=()=>{save();$('st').textContent='Saved to this device (autosave is always on).'};
+$('bn').onclick=()=>{if(confirm('Start a new project?')){while(W.children.length)W.remove(W.children[0]);$('pn').value='Untitled';select(null);commit()}};
+$('be').onclick=()=>{const name=($('pn').value||'project')+'.3dstudio.json',data=JSON.stringify({app:'3DStudio',v:1,name:$('pn').value,objects:JSON.parse(snap())},null,1);
+ if(window.webkit&&webkit.messageHandlers&&webkit.messageHandlers.share)webkit.messageHandlers.share.postMessage({name,data});
+ else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;a.click()}};
+$('bo').onclick=()=>$('fi').click();
+$('fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(j.app!=='3DStudio'||!Array.isArray(j.objects))throw 0;
+ while(W.children.length)W.remove(W.children[0]);j.objects.forEach(mk);$('pn').value=j.name||'Imported';select(null);commit()}catch(x){alert('Not a valid 3D Studio project file.')}};r.readAsText(f);e.target.value=''};
+$('bf').onclick=()=>{const d=document.documentElement;(d.requestFullscreen||d.webkitRequestFullscreen||(()=>{})).call(d)};
+$('bp').onclick=()=>$('app').classList.toggle('hr');
+const view=(a,b)=>{th=a;ph=b;updCam()};$('vt').onclick=()=>view(0,.05);$('vf').onclick=()=>view(0,Math.PI/2);$('vi').onclick=()=>view(.8,1);
+$('ve').onclick=()=>{const b=new T.Box3().setFromObject(W);if(b.isEmpty())return;const s=b.getSize(new T.Vector3());b.getCenter(tgt);dist=Math.max(s.x,s.y,s.z)*2+4;updCam()};
+const ptr=new Map();let dr=null,g0=null,moved=0;
+const gest=()=>{const a=[...ptr.values()];return{x:(a[0][0]+a[1][0])/2,y:(a[0][1]+a[1][1])/2,d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1])||1}};
+cv.onpointerdown=e=>{cv.setPointerCapture(e.pointerId);ptr.set(e.pointerId,[e.clientX,e.clientY]);
+ if(ptr.size==2){dr=null;g0=gest();return}
+ moved=0;const h=pick(e);dr={x:e.clientX,y:e.clientY,k:'orbit',h};
+ if(['move','rotate','scale','pull'].includes(tool)&&h){select(h);Object.assign(dr,{k:tool,p:h.position.clone(),r:h.rotation.y,s:h.scale.clone(),g:gp(e)})}};
+cv.onpointermove=e=>{const o=ptr.get(e.pointerId);
+ if(!o){const g=gp(e);if(g)$('co').textContent=`X ${g.x.toFixed(2)}  Z ${g.z.toFixed(2)}`;return}
+ ptr.set(e.pointerId,[e.clientX,e.clientY]);
+ if(ptr.size==2){const g=gest();if(g0){dist=cl(dist*g0.d/g.d,1,200);pan(g.x-g0.x,g.y-g0.y)}g0=g;updCam();return}
+ if(!dr)return;const dx=e.clientX-dr.x,dy=e.clientY-dr.y;moved=Math.max(moved,Math.hypot(dx,dy));
+ if(dr.k=='orbit'){th-=(e.clientX-o[0])*.008;ph=cl(ph-(e.clientY-o[1])*.008,.05,3.1);updCam();return}
+ if(dr.k=='move'){const g=gp(e);if(g&&dr.g)sel.position.set(sn(dr.p.x+g.x-dr.g.x),dr.p.y,sn(dr.p.z+g.z-dr.g.z))}
+ else if(dr.k=='rotate')sel.rotation.y=dr.r+dx*.01;
+ else if(dr.k=='scale')sel.scale.copy(dr.s).multiplyScalar(Math.max(.05,1-dy/150));
+ else if(dr.k=='pull'){const b0=new T.Box3().setFromObject(sel).min.y;sel.scale.y=Math.max(.02,dr.s.y-dy/40);sel.position.y+=b0-new T.Box3().setFromObject(sel).min.y}
+ upd()};
+cv.onpointerup=cv.onpointercancel=e=>{ptr.delete(e.pointerId);if(ptr.size<2)g0=null;if(!dr)return;const d=dr;dr=null;
+ if(d.k!='orbit'){commit();return}if(moved<6)click(e,d.h)};
+cv.onwheel=e=>{e.preventDefault();dist=cl(dist*(1+e.deltaY*.001),1,200);updCam()};
+function click(e,h){
+ if(tool=='erase'){if(h){W.remove(h);if(sel==h)select(null);commit()}return}
+ if(['rect','circ','line'].includes(tool)){const g=gp(e);if(!g)return;g.set(sn(g.x),0,sn(g.z));
+  if(!p0){p0=g;$('st').textContent='Tap the second point.';return}
+  draw(p0,g);p0=null;$('st').textContent=TOOLS.find(t=>t[0]==tool)[2];return}
+ select(h||null)}
+function draw(a,b){const dx=b.x-a.x,dz=b.z-a.z,mx=(a.x+b.x)/2,mz=(a.z+b.z)/2;let o;
+ if(tool=='rect'){if(!dx||!dz)return;o=mk({t:'cube',n:'Rectangle',s:[Math.abs(dx),.02,Math.abs(dz)],p:[mx,.01,mz]})}
+ else if(tool=='circ'){const r=Math.hypot(dx,dz);if(!r)return;o=mk({t:'cylinder',n:'Circle',s:[2*r,.02,2*r],p:[a.x,.01,a.z]})}
+ else{const L=Math.hypot(dx,dz);if(!L)return;o=mk({t:'cube',n:'Line',s:[L,.04,.04],p:[mx,.02,mz],r:-Math.atan2(dz,dx),c:'#ffd24d'})}
+ select(o);commit()}
+new ResizeObserver(()=>{const r=$('v').getBoundingClientRect();R.setSize(r.width,r.height,false);cam.aspect=r.width/Math.max(1,r.height);cam.updateProjectionMatrix()}).observe($('v'));
+updCam();(function loop(){requestAnimationFrame(loop);R.render(S,cam)})();
+</script></body></html>
