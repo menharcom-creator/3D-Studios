@@ -1,0 +1,41 @@
+name: Build Unsigned IPA
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bundle HTML app and Three.js
+        run: |
+          mkdir -p iOS/Web
+          cp HTML/index.html iOS/Web/index.html
+          curl -fL https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js -o iOS/Web/three.min.js
+          test -s iOS/Web/three.min.js
+      - name: Generate Xcode project
+        working-directory: iOS
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build (no signing)
+        working-directory: iOS
+        run: |
+          xcodebuild -project 3DStudio.xcodeproj -scheme 3DStudio -configuration Release \
+            -sdk iphoneos -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
+      - name: Package IPA
+        working-directory: iOS
+        run: |
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/3DStudio.app Payload/
+          zip -qr 3DStudio-Unsigned.ipa Payload
+      - name: Verify IPA
+        working-directory: iOS
+        run: |
+          unzip -l 3DStudio-Unsigned.ipa | grep -E "Info.plist|Web/index.html|Web/three.min.js|3DStudio.app/3DStudio$"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3DStudio-Unsigned-IPA
+          path: iOS/3DStudio-Unsigned.ipa
